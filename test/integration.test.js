@@ -67,7 +67,7 @@ async function runTests() {
       isSuperuser: true
     });
     assert(registerRes.status === 201, 'Admin user registered successfully');
-    assert(registerRes.data.user.username === 'testadmin', 'Returned correct username');
+    assert(registerRes.data.data.user.username === 'testadmin', 'Returned correct username');
 
     // 2. LOGIN USER
     console.log('\n--- 2. Testing User Login ---');
@@ -76,8 +76,8 @@ async function runTests() {
       password: 'adminpassword123'
     });
     assert(loginRes.status === 200, 'Admin user logged in successfully');
-    assert(loginRes.data.token !== undefined, 'Obtained JWT access token');
-    token = loginRes.data.token;
+    assert(loginRes.data.data.token !== undefined, 'Obtained JWT access token');
+    token = loginRes.data.data.token;
     
     const headers = { 'Authorization': `Bearer ${token}` };
 
@@ -88,8 +88,8 @@ async function runTests() {
       code: 'TEST'
     }, { headers });
     assert(deptRes.status === 201, 'Department created');
-    deptId = deptRes.data.id;
-    assert(deptRes.data.code === 'TEST', 'Department code match');
+    deptId = deptRes.data.data.id;
+    assert(deptRes.data.data.code === 'TEST', 'Department code match');
 
     // 4. CRUD - COURSES
     console.log('\n--- 4. Testing Course CRUD ---');
@@ -100,8 +100,8 @@ async function runTests() {
       department_id: deptId
     }, { headers });
     assert(courseRes.status === 201, 'Course created');
-    courseId = courseRes.data.id;
-    assert(courseRes.data.code === 'TEST101', 'Course code match');
+    courseId = courseRes.data.data.id;
+    assert(courseRes.data.data.code === 'TEST101', 'Course code match');
 
     // 5. CRUD - TEACHERS
     console.log('\n--- 5. Testing Teacher CRUD ---');
@@ -111,8 +111,8 @@ async function runTests() {
       department_id: deptId
     }, { headers });
     assert(teacherRes.status === 201, 'Teacher created');
-    teacherId = teacherRes.data.id;
-    assert(teacherRes.data.employee_id === 'TESTEMP001', 'Teacher employee ID match');
+    teacherId = teacherRes.data.data.id;
+    assert(teacherRes.data.data.employee_id === 'TESTEMP001', 'Teacher employee ID match');
 
     // 6. CRUD - VENUE CAPACITY VALIDATION RULES
     console.log('\n--- 6. Testing Venue Capacity Validation Rules ---');
@@ -137,7 +137,7 @@ async function runTests() {
       building: 'Test Wing'
     }, { headers });
     assert(normalVenueRes.status === 201, 'Regular room created with capacity = 50');
-    normalVenueId = normalVenueRes.data.id;
+    normalVenueId = normalVenueRes.data.data.id;
 
     // Rule B: Main Auditorium must have exactly 300 capacity.
     // Try to create Main Auditorium with 50 capacity (Should Fail)
@@ -159,7 +159,7 @@ async function runTests() {
       building: 'Admin Block'
     }, { headers });
     assert(audVenueRes.status === 201, 'Main Auditorium created with capacity = 300');
-    venueId = audVenueRes.data.id;
+    venueId = audVenueRes.data.data.id;
 
     // 7. CRUD - STUDENTS
     console.log('\n--- 7. Testing Student CRUD ---');
@@ -170,8 +170,8 @@ async function runTests() {
       status: 'Active'
     }, { headers });
     assert(studentRes.status === 201, 'Student created manually');
-    studentId = studentRes.data.id;
-    assert(studentRes.data.status === 'Active', 'Student status match');
+    studentId = studentRes.data.data.id;
+    assert(studentRes.data.data.status === 'Active', 'Student status match');
 
     // 8. CRUD - SECTIONS
     console.log('\n--- 8. Testing Section CRUD ---');
@@ -181,8 +181,8 @@ async function runTests() {
       teacher_id: teacherId
     }, { headers });
     assert(sectionRes.status === 201, 'Course section created');
-    sectionId = sectionRes.data.id;
-    assert(sectionRes.data.name === 'TEST Section A', 'Section name match');
+    sectionId = sectionRes.data.data.id;
+    assert(sectionRes.data.data.name === 'TEST Section A', 'Section name match');
 
     // 9. CRUD - ENROLLMENTS
     console.log('\n--- 9. Testing Enrollment CRUD ---');
@@ -191,7 +191,7 @@ async function runTests() {
       section_id: sectionId
     }, { headers });
     assert(enrollRes.status === 201, 'Student enrolled into section');
-    enrollmentId = enrollRes.data.id;
+    enrollmentId = enrollRes.data.data.id;
 
     // 10. EXCEL INGESTION (STUDENTS UPLOAD)
     console.log('\n--- 10. Testing Excel Student Ingestion ---');
@@ -224,22 +224,23 @@ async function runTests() {
 
     const uploadRes = await axios.post(`${BASE_URL}/api/students/upload`, postData, { headers: uploadHeaders });
     assert(uploadRes.status === 200, 'Excel file uploaded and processed successfully');
-    assert(uploadRes.data.summary.totalRowsProcessed === 3, 'Processed 3 student rows');
-    assert(uploadRes.data.summary.successfullyImported === 3, 'Imported 3 student rows');
+    assert(uploadRes.data.data.summary.totalRowsProcessed === 3, 'Processed 3 student rows');
+    assert(uploadRes.data.data.summary.successfullyImported === 3, 'Imported 3 student rows');
 
     // 11. INTEGRATION WITH PYTHON SCHEDULING ENGINE
     console.log('\n--- 11. Testing Python Scheduling Engine Integration ---');
     
     const triggerRes = await axios.post(`${BASE_URL}/api/schedule/generate`, {}, { headers });
     assert(triggerRes.status === 200, 'Scheduler trigger returned 200 OK immediately');
-    assert(triggerRes.data.status === 'started', 'State reports started');
+    assert(triggerRes.data.data.status === 'started', 'State reports started');
 
     // Check polling status
     const statusRes = await axios.get(`${BASE_URL}/api/schedule/status`, { headers });
     assert(statusRes.status === 200, 'Fetched status successfully');
-    console.log('Current Scheduling Step:', statusRes.data.step);
+    console.log('Current Scheduling Step:', statusRes.data.data.step);
 
     console.log('\n🌟 Integration Test Suite Completed Successfully! All tests passed.');
+    server.close();
     process.exit(0);
 
   } catch (error) {
@@ -251,6 +252,7 @@ async function runTests() {
       console.error(error.message);
       if (error.stack) console.error(error.stack);
     }
+    server.close();
     process.exit(1);
   }
 }

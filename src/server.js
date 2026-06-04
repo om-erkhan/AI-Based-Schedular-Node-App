@@ -20,6 +20,65 @@ app.use(cors());
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 
+// Response formatter middleware: enforces { success, code, message, data } format
+app.use((req, res, next) => {
+  const originalJson = res.json;
+
+  res.json = function(body) {
+    // If it's already fully formatted as our 4-key JSON envelope, pass it through directly
+    if (body && typeof body === 'object' && 'success' in body && 'code' in body && 'message' in body && 'data' in body) {
+      return originalJson.call(this, body);
+    }
+
+    const success = res.statusCode >= 200 && res.statusCode < 300;
+    let message = success ? 'Request completed successfully' : 'An error occurred';
+    let dataPayload = null;
+
+    if (body !== undefined && body !== null) {
+      if (typeof body === 'string') {
+        message = body;
+      } else if (typeof body === 'object') {
+        // Extract message or error message
+        if (body.message) {
+          message = body.message;
+        } else if (body.error) {
+          message = body.error;
+        }
+
+        // Determine the data payload
+        if (Array.isArray(body)) {
+          dataPayload = body;
+        } else {
+          // It's a non-null object. Let's see if it has other properties besides 'message' and 'error'.
+          const keys = Object.keys(body);
+          const hasOtherKeys = keys.some(k => k !== 'message' && k !== 'error');
+          if (hasOtherKeys) {
+            const temp = { ...body };
+            delete temp.message;
+            delete temp.error;
+            dataPayload = temp;
+          } else {
+            dataPayload = null;
+          }
+        }
+      } else {
+        dataPayload = body;
+      }
+    }
+
+    const formattedResponse = {
+      success,
+      code: res.statusCode,
+      message,
+      data: dataPayload
+    };
+
+    return originalJson.call(this, formattedResponse);
+  };
+
+  next();
+});
+
 // Serve static files for the premium frontend UI
 app.use(express.static(path.join(__dirname, 'public')));
 

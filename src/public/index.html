@@ -839,15 +839,15 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username: usernameVal, password: passwordVal })
         });
-        const data = await res.json();
+        const wrapped = await res.json();
 
-        if (res.ok) {
-          activeToken = data.token;
+        if (res.ok && wrapped.success) {
+          activeToken = wrapped.data.token;
           localStorage.setItem('jwt_token', activeToken);
-          showToast('Signed in successfully');
+          showToast(wrapped.message || 'Signed in successfully');
           showDashboard();
         } else {
-          showToast(data.error || 'Authentication failed', true);
+          showToast(wrapped.message || 'Authentication failed', true);
         }
       } catch (err) {
         showToast('Server connection failed', true);
@@ -905,10 +905,10 @@
 
         if (deptsRes.status === 401) { logout(); return; }
 
-        const depts = await deptsRes.json();
-        const courses = await coursesRes.json();
-        const venues = await venuesRes.json();
-        const students = await studentsRes.json();
+        const depts = (await deptsRes.json()).data || [];
+        const courses = (await coursesRes.json()).data || [];
+        const venues = (await venuesRes.json()).data || [];
+        const students = (await studentsRes.json()).data || [];
 
         document.getElementById('stat-departments').innerText = Array.isArray(depts) ? depts.length : 0;
         document.getElementById('stat-courses').innerText = Array.isArray(courses) ? courses.length : 0;
@@ -926,11 +926,12 @@
         const res = await fetch(`${API_URL}/api/students`, {
           headers: { 'Authorization': `Bearer ${activeToken}` }
         });
-        const list = await res.json();
+        const wrapped = await res.json();
+        const list = wrapped.data || [];
         const tbody = document.querySelector('#students-table tbody');
         
-        if (!res.ok) {
-          tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-accent);">${list.error}</td></tr>`;
+        if (!res.ok || !wrapped.success) {
+          tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-accent);">${wrapped.message}</td></tr>`;
           return;
         }
 
@@ -966,11 +967,12 @@
         const res = await fetch(`${API_URL}/api/venues`, {
           headers: { 'Authorization': `Bearer ${activeToken}` }
         });
-        const list = await res.json();
+        const wrapped = await res.json();
+        const list = wrapped.data || [];
         const tbody = document.querySelector('#venues-table tbody');
 
-        if (!res.ok) {
-          tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-accent);">${list.error}</td></tr>`;
+        if (!res.ok || !wrapped.success) {
+          tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-accent);">${wrapped.message}</td></tr>`;
           return;
         }
 
@@ -1016,14 +1018,14 @@
           },
           body: JSON.stringify({ name, capacity, building })
         });
-        const data = await res.json();
+        const wrapped = await res.json();
 
-        if (res.ok) {
-          showToast('Venue registered successfully');
+        if (res.ok && wrapped.success) {
+          showToast(wrapped.message || 'Venue registered successfully');
           hideAddVenueModal();
           loadVenues();
         } else {
-          showToast(data.error || 'Failed to save venue', true);
+          showToast(wrapped.message || 'Failed to save venue', true);
         }
       } catch (err) {
         showToast('Server validation failed', true);
@@ -1068,17 +1070,18 @@
           headers: { 'Authorization': `Bearer ${activeToken}` },
           body: formData
         });
-        const data = await res.json();
+        const wrapped = await res.json();
+        const data = wrapped.data;
 
-        if (res.ok) {
-          showToast('Excel ingestion processed successfully');
+        if (res.ok && wrapped.success) {
+          showToast(wrapped.message || 'Excel ingestion processed successfully');
           document.getElementById('upload-results').style.display = 'block';
           document.getElementById('res-processed').innerText = data.summary.totalRowsProcessed;
           document.getElementById('res-imported').innerText = data.summary.successfullyImported;
           document.getElementById('res-skipped').innerText = data.summary.skippedCount;
 
           const skippedDiv = document.getElementById('skipped-details');
-          if (data.skipped.length > 0) {
+          if (data.skipped && data.skipped.length > 0) {
             skippedDiv.innerHTML = '<strong>Skipped Rows Details:</strong><br>' + 
               data.skipped.map(s => `Row ${s.rowNumber}: ${s.reason}`).join('<br>');
           } else {
@@ -1086,7 +1089,7 @@
           }
           loadStudents();
         } else {
-          showToast(data.error || 'Excel parsing failed', true);
+          showToast(wrapped.message || 'Excel parsing failed', true);
         }
       } catch (err) {
         showToast('Ingestion pipeline communication error', true);
@@ -1105,13 +1108,13 @@
           method: 'POST',
           headers: { 'Authorization': `Bearer ${activeToken}` }
         });
-        const data = await res.json();
+        const wrapped = await res.json();
 
-        if (res.ok) {
-          showToast(data.message || 'Scheduling pipeline triggered successfully');
+        if (res.ok && wrapped.success) {
+          showToast(wrapped.message || 'Scheduling pipeline triggered successfully');
           startSchedulerPoll();
         } else {
-          showToast(data.error || 'Failed to start scheduler engine', true);
+          showToast(wrapped.message || 'Failed to start scheduler engine', true);
           document.getElementById('btn-trigger').disabled = false;
         }
       } catch (err) {
@@ -1125,7 +1128,8 @@
         const res = await fetch(`${API_URL}/api/schedule/status`, {
           headers: { 'Authorization': `Bearer ${activeToken}` }
         });
-        const data = await res.ok ? await res.json() : null;
+        const wrapped = await res.json();
+        const data = res.ok && wrapped.success ? wrapped.data : null;
 
         if (!data) return;
 
@@ -1199,10 +1203,11 @@
         const res = await fetch(`${API_URL}/api/schedule/${scheduleId}`, {
           headers: { 'Authorization': `Bearer ${activeToken}` }
         });
-        const data = await res.json();
+        const wrapped = await res.json();
+        const data = wrapped.data;
 
-        if (!res.ok) {
-          showToast(data.error || 'Failed to fetch timetable details', true);
+        if (!res.ok || !wrapped.success) {
+          showToast(wrapped.message || 'Failed to fetch timetable details', true);
           return;
         }
 
