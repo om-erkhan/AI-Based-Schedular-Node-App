@@ -43,9 +43,10 @@
               "script": {
                 "exec": [
                   "const response = pm.response.json();",
-                  "if (response.token) {",
-                  "    pm.environment.set(\"jwt_token\", response.token);",
-                  "    console.log(\"Saved jwt_token:\", response.token);",
+                  "const token = (response.data && response.data.token) || response.token;",
+                  "if (token) {",
+                  "    pm.environment.set(\"jwt_token\", token);",
+                  "    console.log(\"Saved jwt_token:\", token);",
                   "}"
                 ],
                 "type": "text/javascript"
