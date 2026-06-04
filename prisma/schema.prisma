@@ -1,0 +1,259 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model auth_group {
+  id                     Int                      @id @default(autoincrement())
+  name                   String                   @unique @db.VarChar(150)
+  auth_group_permissions auth_group_permissions[]
+  auth_user_groups       auth_user_groups[]
+
+  @@index([name], map: "auth_group_name_a6ea08ec_like")
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model auth_group_permissions {
+  id              BigInt          @id @default(autoincrement())
+  group_id        Int
+  permission_id   Int
+  auth_permission auth_permission @relation(fields: [permission_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "auth_group_permissio_permission_id_84c5c92e_fk_auth_perm")
+  auth_group      auth_group      @relation(fields: [group_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "auth_group_permissions_group_id_b120cbf9_fk_auth_group_id")
+
+  @@unique([group_id, permission_id], map: "auth_group_permissions_group_id_permission_id_0cd325b0_uniq")
+  @@index([group_id], map: "auth_group_permissions_group_id_b120cbf9")
+  @@index([permission_id], map: "auth_group_permissions_permission_id_84c5c92e")
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model auth_permission {
+  id                         Int                          @id @default(autoincrement())
+  name                       String                       @db.VarChar(255)
+  content_type_id            Int
+  codename                   String                       @db.VarChar(100)
+  auth_group_permissions     auth_group_permissions[]
+  django_content_type        django_content_type          @relation(fields: [content_type_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "auth_permission_content_type_id_2f476e4b_fk_django_co")
+  auth_user_user_permissions auth_user_user_permissions[]
+
+  @@unique([content_type_id, codename], map: "auth_permission_content_type_id_codename_01ab375a_uniq")
+  @@index([content_type_id], map: "auth_permission_content_type_id_2f476e4b")
+}
+
+model auth_user {
+  id                         Int                          @id @default(autoincrement())
+  password                   String                       @db.VarChar(128)
+  last_login                 DateTime?                    @db.Timestamptz(6)
+  is_superuser               Boolean
+  username                   String                       @unique @db.VarChar(150)
+  first_name                 String                       @db.VarChar(150)
+  last_name                  String                       @db.VarChar(150)
+  email                      String                       @db.VarChar(254)
+  is_staff                   Boolean
+  is_active                  Boolean
+  date_joined                DateTime                     @db.Timestamptz(6)
+  auth_user_groups           auth_user_groups[]
+  auth_user_user_permissions auth_user_user_permissions[]
+  django_admin_log           django_admin_log[]
+
+  @@index([username], map: "auth_user_username_6821ab7c_like")
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model auth_user_groups {
+  id         BigInt     @id @default(autoincrement())
+  user_id    Int
+  group_id   Int
+  auth_group auth_group @relation(fields: [group_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "auth_user_groups_group_id_97559544_fk_auth_group_id")
+  auth_user  auth_user  @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "auth_user_groups_user_id_6a12ed8b_fk_auth_user_id")
+
+  @@unique([user_id, group_id], map: "auth_user_groups_user_id_group_id_94350c0c_uniq")
+  @@index([group_id], map: "auth_user_groups_group_id_97559544")
+  @@index([user_id], map: "auth_user_groups_user_id_6a12ed8b")
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model auth_user_user_permissions {
+  id              BigInt          @id @default(autoincrement())
+  user_id         Int
+  permission_id   Int
+  auth_permission auth_permission @relation(fields: [permission_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "auth_user_user_permi_permission_id_1fbb5f2c_fk_auth_perm")
+  auth_user       auth_user       @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "auth_user_user_permissions_user_id_a95ead1b_fk_auth_user_id")
+
+  @@unique([user_id, permission_id], map: "auth_user_user_permissions_user_id_permission_id_14a6b632_uniq")
+  @@index([permission_id], map: "auth_user_user_permissions_permission_id_1fbb5f2c")
+  @@index([user_id], map: "auth_user_user_permissions_user_id_a95ead1b")
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model courses {
+  id            BigInt      @id @default(autoincrement())
+  name          String      @db.VarChar(200)
+  code          String      @unique @db.VarChar(20)
+  credit_hours  Int
+  department_id BigInt
+  departments   departments @relation(fields: [department_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "courses_department_id_3eedabe1_fk_departments_id")
+  sections      sections[]
+
+  @@index([code], map: "courses_code_0a35cb9a_like")
+  @@index([department_id], map: "courses_department_id_3eedabe1")
+}
+
+model departments {
+  id       BigInt     @id @default(autoincrement())
+  name     String     @db.VarChar(100)
+  code     String     @unique @db.VarChar(10)
+  courses  courses[]
+  students students[]
+  teachers teachers[]
+
+  @@index([code], map: "departments_code_50a91790_like")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model django_admin_log {
+  id                  Int                  @id @default(autoincrement())
+  action_time         DateTime             @db.Timestamptz(6)
+  object_id           String?
+  object_repr         String               @db.VarChar(200)
+  action_flag         Int                  @db.SmallInt
+  change_message      String
+  content_type_id     Int?
+  user_id             Int
+  django_content_type django_content_type? @relation(fields: [content_type_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "django_admin_log_content_type_id_c4bce8eb_fk_django_co")
+  auth_user           auth_user            @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "django_admin_log_user_id_c564eba6_fk_auth_user_id")
+
+  @@index([content_type_id], map: "django_admin_log_content_type_id_c4bce8eb")
+  @@index([user_id], map: "django_admin_log_user_id_c564eba6")
+}
+
+model django_content_type {
+  id               Int                @id @default(autoincrement())
+  app_label        String             @db.VarChar(100)
+  model            String             @db.VarChar(100)
+  auth_permission  auth_permission[]
+  django_admin_log django_admin_log[]
+
+  @@unique([app_label, model], map: "django_content_type_app_label_model_76bd3d3b_uniq")
+}
+
+model django_migrations {
+  id      BigInt   @id @default(autoincrement())
+  app     String   @db.VarChar(255)
+  name    String   @db.VarChar(255)
+  applied DateTime @db.Timestamptz(6)
+}
+
+model django_session {
+  session_key  String   @id @db.VarChar(40)
+  session_data String
+  expire_date  DateTime @db.Timestamptz(6)
+
+  @@index([expire_date], map: "django_session_expire_date_a5c62663")
+  @@index([session_key], map: "django_session_session_key_c0390e0f_like")
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model enrollments {
+  id              BigInt   @id @default(autoincrement())
+  enrollment_date DateTime @db.Date
+  section_id      BigInt
+  student_id      BigInt
+  sections        sections @relation(fields: [section_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "enrollments_section_id_701fe2fd_fk_sections_id")
+  students        students @relation(fields: [student_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "enrollments_student_id_19c0bed4_fk_students_id")
+
+  @@unique([student_id, section_id], map: "enrollments_student_id_section_id_d1664a64_uniq")
+  @@index([section_id], map: "enrollments_section_id_701fe2fd")
+  @@index([student_id], map: "enrollments_student_id_19c0bed4")
+}
+
+model exam_schedules {
+  id               BigInt             @id @default(autoincrement())
+  name             String             @db.VarChar(100)
+  created_at       DateTime           @db.Timestamptz(6)
+  fitness_score    Float
+  is_active        Boolean
+  schedule_entries schedule_entries[]
+}
+
+model exam_slots {
+  id               BigInt             @id @default(autoincrement())
+  date             DateTime           @db.Date
+  start_time       DateTime           @db.Time(6)
+  end_time         DateTime           @db.Time(6)
+  slot_index       Int
+  schedule_entries schedule_entries[]
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model schedule_entries {
+  id             BigInt         @id @default(autoincrement())
+  part           String         @db.VarChar(10)
+  schedule_id    BigInt
+  slot_id        BigInt
+  section_id     BigInt
+  venue_id       BigInt
+  exam_schedules exam_schedules @relation(fields: [schedule_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "schedule_entries_schedule_id_bb9148d7_fk_exam_schedules_id")
+  sections       sections       @relation(fields: [section_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "schedule_entries_section_id_563842f7_fk_sections_id")
+  exam_slots     exam_slots     @relation(fields: [slot_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "schedule_entries_slot_id_cc3d2c64_fk_exam_slots_id")
+  venues         venues         @relation(fields: [venue_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "schedule_entries_venue_id_23fa0925_fk_venues_id")
+
+  @@index([schedule_id], map: "schedule_entries_schedule_id_bb9148d7")
+  @@index([section_id], map: "schedule_entries_section_id_563842f7")
+  @@index([slot_id], map: "schedule_entries_slot_id_cc3d2c64")
+  @@index([venue_id], map: "schedule_entries_venue_id_23fa0925")
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model sections {
+  id               BigInt             @id @default(autoincrement())
+  name             String             @db.VarChar(50)
+  course_id        BigInt
+  teacher_id       BigInt
+  enrollments      enrollments[]
+  schedule_entries schedule_entries[]
+  courses          courses            @relation(fields: [course_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "sections_course_id_e9052f71_fk_courses_id")
+  teachers         teachers           @relation(fields: [teacher_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "sections_teacher_id_e3ddd929_fk_teachers_id")
+
+  @@index([course_id], map: "sections_course_id_e9052f71")
+  @@index([teacher_id], map: "sections_teacher_id_e3ddd929")
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model students {
+  id            BigInt        @id @default(autoincrement())
+  student_id    String        @unique @db.VarChar(20)
+  name          String        @db.VarChar(200)
+  department_id BigInt
+  status        String        @db.VarChar(20)
+  enrollments   enrollments[]
+  departments   departments   @relation(fields: [department_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "students_department_id_9c73830b_fk_departments_id")
+
+  @@index([department_id], map: "students_department_id_9c73830b")
+  @@index([student_id], map: "students_student_id_563bb1b1_like")
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model teachers {
+  id            BigInt      @id @default(autoincrement())
+  name          String      @db.VarChar(200)
+  employee_id   String      @unique @db.VarChar(20)
+  department_id BigInt
+  sections      sections[]
+  departments   departments @relation(fields: [department_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "teachers_department_id_3458aa5b_fk_departments_id")
+
+  @@index([department_id], map: "teachers_department_id_3458aa5b")
+  @@index([employee_id], map: "teachers_employee_id_0179b9ad_like")
+}
+
+model venues {
+  id               BigInt             @id @default(autoincrement())
+  name             String             @db.VarChar(100)
+  capacity         Int
+  building         String?            @db.VarChar(100)
+  schedule_entries schedule_entries[]
+}
