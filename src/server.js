@@ -82,10 +82,10 @@ app.use((req, res, next) => {
 // Serve static files for the premium frontend UI
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Mount API Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/schedule', schedulerRoutes);
-app.use('/api', crudRoutes); // Entity CRUD and Uploads
+// Mount API Routes (accept both with and without /api prefix for compatibility)
+app.use(['/api/auth', '/auth'], authRoutes);
+app.use(['/api/schedule', '/schedule'], schedulerRoutes);
+app.use(['/api', '/'], crudRoutes); // Entity CRUD and Uploads
 
 // Fallback to index.html for SPA frontend routing
 app.use((req, res, next) => {
