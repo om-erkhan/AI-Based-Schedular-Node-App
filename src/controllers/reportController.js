@@ -272,8 +272,9 @@ async function getGapReport(req, res) {
             const gapMs = startNext - end;
             const gapHours = gapMs / (1000 * 60 * 60);
 
-            // Flag if the gap between exams is > 3.5 hours on the same day
-            if (gapHours > 3.5) {
+            // Flag if the gap between exams is NOT exactly a 1-slot break (which is exactly 3 hours)
+            // consecutive exams = 0.5 hours gap. 2-slot break = 5.5 hours gap.
+            if (Math.abs(gapHours - 3) > 0.1) {
               const formatTime = (dateObj) => {
                 return new Date(dateObj).toISOString().split('T')[1].substring(0, 5);
               };
