@@ -9,23 +9,20 @@ async function authenticate(req, res, next) {
     }
 
     const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'supersecretjwtkeyforexamscheduling');
-    
-    const user = await prisma.auth_user.findUnique({
-      where: { id: decoded.userId }
-    });
-
-    if (!user) {
-      return res.status(401).json({ error: 'User not found or disabled' });
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET || 'supersecretjwtkeyforexamscheduling');
+    } catch (jwtErr) {
+      return res.status(401).json({ error: 'Invalid or expired access token' });
     }
 
-    // Attach user profile to request
+    // Attach user profile to request directly from the cryptographically signed token
     req.user = {
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      isSuperuser: user.is_superuser,
-      isStaff: user.is_staff
+      id: decoded.userId,
+      username: decoded.username,
+      email: decoded.email,
+      isSuperuser: !!decoded.isSuperuser,
+      isStaff: !!decoded.isStaff
     };
 
     next();

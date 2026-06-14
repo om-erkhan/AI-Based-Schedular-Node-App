@@ -36,6 +36,9 @@ async function importStudents(req, res) {
       const name = String(row['name'] || row['Name'] || row['Full Name'] || '').trim();
       const deptCode = String(row['department_code'] || row['Department Code'] || row['department'] || '').trim().toUpperCase();
       let status = String(row['status'] || row['Status'] || 'Active').trim();
+      const semester = row['semester'] || row['Semester'] ? String(row['semester'] || row['Semester']).trim() : null;
+      const email = row['email'] || row['Email'] || row['Email Address'] ? String(row['email'] || row['Email'] || row['Email Address']).trim() : null;
+      const phone = row['phone'] || row['Phone'] || row['Phone Number'] ? String(row['phone'] || row['Phone'] || row['Phone Number']).trim() : null;
 
       // Basic row validation
       if (!studentId || !name || !deptCode) {
@@ -70,13 +73,19 @@ async function importStudents(req, res) {
           update: {
             name,
             department_id: departmentId,
-            status
+            status,
+            semester,
+            email,
+            phone
           },
           create: {
             student_id: studentId,
             name,
             department_id: departmentId,
-            status
+            status,
+            semester,
+            email,
+            phone
           }
         });
         imported.push(student);

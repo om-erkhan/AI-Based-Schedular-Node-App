@@ -54,8 +54,8 @@ async function triggerScheduleGeneration(req, res) {
   try {
     const pythonUrl = process.env.PYTHON_SERVICE_URL || 'http://localhost:8001';
 
-    // Call Python microservice
-    const response = await axios.post(`${pythonUrl}/api/generate-schedule`);
+    // Call Python microservice with the body payload from the frontend
+    const response = await axios.post(`${pythonUrl}/api/generate-schedule`, req.body);
     
     // Reset our local state and immediately start background polling
     schedulingState = {
@@ -98,9 +98,20 @@ async function getScheduleStatus(req, res) {
 
 async function getScheduleTimetable(req, res) {
   try {
-    const scheduleId = parseInt(req.params.id, 10);
-    if (isNaN(scheduleId)) {
-      return res.status(400).json({ error: 'Invalid schedule ID' });
+    let scheduleId;
+    if (!req.params.id || req.params.id === 'latest') {
+      const latestSchedule = await prisma.exam_schedules.findFirst({
+        orderBy: { created_at: 'desc' }
+      });
+      if (!latestSchedule) {
+        return res.status(404).json({ error: 'No schedule has been generated yet.' });
+      }
+      scheduleId = Number(latestSchedule.id);
+    } else {
+      scheduleId = parseInt(req.params.id, 10);
+      if (isNaN(scheduleId)) {
+        return res.status(400).json({ error: 'Invalid schedule ID' });
+      }
     }
 
     // Check if the schedule exists
@@ -186,8 +197,44 @@ async function getScheduleTimetable(req, res) {
   }
 }
 
+async function downloadTimetablePdf(req, res) {
+  try {
+    const pythonUrl = process.env.PYTHON_SERVICE_URL || 'http://localhost:8001';
+    const response = await axios({
+      method: 'get',
+      url: `${pythonUrl}/api/reports/schedule-pdf`,
+      responseType: 'stream'
+    });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="exam_schedule.pdf"');
+    response.data.pipe(res);
+  } catch (error) {
+    console.error('Failed to download schedule PDF:', error.message);
+    res.status(500).json({ error: 'Failed to generate PDF report' });
+  }
+}
+
+async function downloadStudentsPdf(req, res) {
+  try {
+    const pythonUrl = process.env.PYTHON_SERVICE_URL || 'http://localhost:8001';
+    const response = await axios({
+      method: 'get',
+      url: `${pythonUrl}/api/reports/students-pdf`,
+      responseType: 'stream'
+    });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="course_students_venue.pdf"');
+    response.data.pipe(res);
+  } catch (error) {
+    console.error('Failed to download students PDF:', error.message);
+    res.status(500).json({ error: 'Failed to generate PDF report' });
+  }
+}
+
 module.exports = {
   triggerScheduleGeneration,
   getScheduleStatus,
-  getScheduleTimetable
+  getScheduleTimetable,
+  downloadTimetablePdf,
+  downloadStudentsPdf
 };

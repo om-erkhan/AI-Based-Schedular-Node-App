@@ -405,7 +405,7 @@ async function getStudentById(req, res) {
 
 async function createStudent(req, res) {
   try {
-    const { student_id, name, department_id, status } = req.body;
+    const { student_id, name, department_id, status, semester, email, phone } = req.body;
     if (!student_id || !name || !department_id) {
       return res.status(400).json({ error: 'student_id, name, and department_id are required' });
     }
@@ -428,7 +428,10 @@ async function createStudent(req, res) {
         student_id,
         name,
         department_id: parseInt(department_id, 10),
-        status: finalStatus
+        status: finalStatus,
+        semester: semester || null,
+        email: email || null,
+        phone: phone || null
       }
     });
     return res.status(201).json(newItem);
@@ -440,7 +443,7 @@ async function createStudent(req, res) {
 async function updateStudent(req, res) {
   try {
     const id = parseInt(req.params.id, 10);
-    const { student_id, name, department_id, status } = req.body;
+    const { student_id, name, department_id, status, semester, email, phone } = req.body;
 
     const existing = await prisma.students.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ error: 'Student not found' });
@@ -468,7 +471,10 @@ async function updateStudent(req, res) {
         student_id,
         name,
         department_id: department_id !== undefined ? parseInt(department_id, 10) : undefined,
-        status
+        status,
+        semester: semester !== undefined ? semester : undefined,
+        email: email !== undefined ? email : undefined,
+        phone: phone !== undefined ? phone : undefined
       }
     });
     return res.json(updated);
@@ -642,6 +648,18 @@ async function createEnrollment(req, res) {
     const section = await prisma.sections.findUnique({ where: { id: section_id } });
     if (!section) return res.status(400).json({ error: 'Invalid section_id' });
 
+    // Validate enrollment limit: max 55 students per course (across all sections)
+    const courseEnrollmentCount = await prisma.enrollments.count({
+      where: {
+        sections: {
+          course_id: section.course_id
+        }
+      }
+    });
+    if (courseEnrollmentCount >= 55) {
+      return res.status(400).json({ error: 'This course has reached its maximum enrollment capacity of 55 students.' });
+    }
+
     // Check unique constraint
     const existing = await prisma.enrollments.findUnique({
       where: {
@@ -685,6 +703,20 @@ async function updateEnrollment(req, res) {
     if (section_id) {
       const section = await prisma.sections.findUnique({ where: { id: section_id } });
       if (!section) return res.status(400).json({ error: 'Invalid section_id' });
+
+      // Enforce the 55 limit if changing section (or if it wasn't validated previously)
+      if (parseInt(section_id, 10) !== Number(existing.section_id)) {
+        const courseEnrollmentCount = await prisma.enrollments.count({
+          where: {
+            sections: {
+              course_id: section.course_id
+            }
+          }
+        });
+        if (courseEnrollmentCount >= 55) {
+          return res.status(400).json({ error: 'This course has reached its maximum enrollment capacity of 55 students.' });
+        }
+      }
     }
 
     // Check unique constraint

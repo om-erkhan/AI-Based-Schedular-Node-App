@@ -3,9 +3,20 @@ const prisma = require('../config/db');
 // --- 1. CONFLICT REPORT ---
 async function getConflictReport(req, res) {
   try {
-    const scheduleId = parseInt(req.params.id, 10);
-    if (isNaN(scheduleId)) {
-      return res.status(400).json({ error: 'Invalid schedule ID' });
+    let scheduleId;
+    if (req.params.id) {
+      scheduleId = parseInt(req.params.id, 10);
+      if (isNaN(scheduleId)) {
+        return res.status(400).json({ error: 'Invalid schedule ID' });
+      }
+    } else {
+      const latestSchedule = await prisma.exam_schedules.findFirst({
+        orderBy: { created_at: 'desc' }
+      });
+      if (!latestSchedule) {
+        return res.status(404).json({ error: 'No schedule has been generated yet.' });
+      }
+      scheduleId = latestSchedule.id;
     }
 
     const schedule = await prisma.exam_schedules.findUnique({ where: { id: scheduleId } });
@@ -188,9 +199,20 @@ async function getConflictReport(req, res) {
 // --- 2. GAP REPORT ---
 async function getGapReport(req, res) {
   try {
-    const scheduleId = parseInt(req.params.id, 10);
-    if (isNaN(scheduleId)) {
-      return res.status(400).json({ error: 'Invalid schedule ID' });
+    let scheduleId;
+    if (req.params.id) {
+      scheduleId = parseInt(req.params.id, 10);
+      if (isNaN(scheduleId)) {
+        return res.status(400).json({ error: 'Invalid schedule ID' });
+      }
+    } else {
+      const latestSchedule = await prisma.exam_schedules.findFirst({
+        orderBy: { created_at: 'desc' }
+      });
+      if (!latestSchedule) {
+        return res.status(404).json({ error: 'No schedule has been generated yet.' });
+      }
+      scheduleId = latestSchedule.id;
     }
 
     const schedule = await prisma.exam_schedules.findUnique({ where: { id: scheduleId } });
@@ -366,6 +388,38 @@ async function getCourseStudents(req, res) {
       enrollmentDate: enr.enrollment_date
     }));
 
+    // Find all schedule entries for these sections
+    const scheduleEntries = await prisma.schedule_entries.findMany({
+      where: { section_id: { in: sectionIds } },
+      include: {
+        exam_slots: true,
+        venues: true,
+        exam_schedules: true
+      }
+    });
+
+    const formatTime = (dateObj) => {
+      return new Date(dateObj).toISOString().split('T')[1].substring(0, 5);
+    };
+
+    const schedule = scheduleEntries.map(entry => ({
+      id: entry.id,
+      part: entry.part,
+      scheduleName: entry.exam_schedules.name,
+      sectionName: sectionsList.find(s => String(s.id) === String(entry.section_id))?.name || 'N/A',
+      slot: {
+        date: entry.exam_slots.date.toISOString().split('T')[0],
+        startTime: formatTime(entry.exam_slots.start_time),
+        endTime: formatTime(entry.exam_slots.end_time),
+        slotIndex: entry.exam_slots.slot_index
+      },
+      venue: {
+        name: entry.venues.name,
+        capacity: entry.venues.capacity,
+        building: entry.venues.building
+      }
+    }));
+
     return res.json({
       course: {
         id: course.id,
@@ -375,9 +429,11 @@ async function getCourseStudents(req, res) {
         department: course.departments.name
       },
       summary: {
-        totalStudentsCount: registeredStudents.length
+        totalStudentsCount: registeredStudents.length,
+        scheduleCount: schedule.length
       },
-      registeredStudents
+      registeredStudents,
+      schedule
     });
 
   } catch (error) {

@@ -80,7 +80,13 @@ async function login(req, res) {
 
     // Generate JWT
     const token = jwt.sign(
-      { userId: user.id, username: user.username },
+      { 
+        userId: user.id, 
+        username: user.username,
+        email: user.email,
+        isSuperuser: user.is_superuser,
+        isStaff: user.is_staff
+      },
       process.env.JWT_SECRET || 'supersecretjwtkeyforexamscheduling',
       { expiresIn: '24h' }
     );

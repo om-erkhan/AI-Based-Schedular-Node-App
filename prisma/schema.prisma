@@ -230,6 +230,9 @@ model students {
   name          String        @db.VarChar(200)
   department_id BigInt
   status        String        @db.VarChar(20)
+  semester      String?       @db.VarChar(50)
+  email         String?       @db.VarChar(100)
+  phone         String?       @db.VarChar(30)
   enrollments   enrollments[]
   departments   departments   @relation(fields: [department_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "students_department_id_9c73830b_fk_departments_id")
 
