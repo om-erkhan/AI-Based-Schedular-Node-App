@@ -11,6 +11,9 @@ async function getConflictReport(req, res) {
       }
     } else {
       const latestSchedule = await prisma.exam_schedules.findFirst({
+        where: { is_active: true },
+        orderBy: { created_at: 'desc' }
+      }) || await prisma.exam_schedules.findFirst({
         orderBy: { created_at: 'desc' }
       });
       if (!latestSchedule) {
@@ -39,8 +42,10 @@ async function getConflictReport(req, res) {
       }
     });
 
-    // Fetch all student enrollments
+    // Fetch only enrollments for sections in these entries
+    const sectionIds = entries.map(e => e.section_id);
     const enrollments = await prisma.enrollments.findMany({
+      where: { section_id: { in: sectionIds } },
       include: { students: true }
     });
 
@@ -81,11 +86,18 @@ async function getConflictReport(req, res) {
       if (!venueSlotMap[vKey]) venueSlotMap[vKey] = [];
       venueSlotMap[vKey].push(entry);
 
-      // Split the section's students into Part 1 and Part 2 consistently
+      // Reconstruct exactly which students are in this Part using 20-student chunks
       const allStudents = sectionStudentsMap[sectionId] || [];
       allStudents.sort((a, b) => Number(a) - Number(b)); // Order consistently
-      const mid = Math.floor(allStudents.length / 2);
-      const pStudents = entry.part === 'Part 1' ? allStudents.slice(0, mid) : allStudents.slice(mid);
+      const chunkSize = 20;
+      let partNum = 1;
+      try {
+        partNum = parseInt(entry.part.split(' ')[1], 10) || 1;
+      } catch (e) {
+        partNum = 1;
+      }
+      const startIdx = (partNum - 1) * chunkSize;
+      const pStudents = allStudents.slice(startIdx, startIdx + chunkSize);
       
       entryStudentsMap[entry.id] = pStudents;
 
@@ -127,7 +139,7 @@ async function getConflictReport(req, res) {
         totalStudents += stIds.length;
       }
       
-      const requiredCapacity = totalStudents * 2;
+      const requiredCapacity = totalStudents; // No social distancing multiplier
       const actualCapacity = shared[0].venues.capacity;
       if (requiredCapacity > actualCapacity) {
         capacityViolations.push({
@@ -148,10 +160,13 @@ async function getConflictReport(req, res) {
     }
 
     // Evaluate: Student Clashes (student has multiple exams in same slot)
-    // Gather student details for readability
-    const studentsDb = await prisma.students.findMany();
+    // Gather student details for readability from already fetched enrollments
     const studentsMap = {};
-    studentsDb.forEach(s => { studentsMap[s.id] = s; });
+    enrollments.forEach(e => {
+      if (e.students) {
+        studentsMap[e.students.id] = e.students;
+      }
+    });
 
     for (const key in studentSlotMap) {
       const shared = studentSlotMap[key];
@@ -207,6 +222,9 @@ async function getGapReport(req, res) {
       }
     } else {
       const latestSchedule = await prisma.exam_schedules.findFirst({
+        where: { is_active: true },
+        orderBy: { created_at: 'desc' }
+      }) || await prisma.exam_schedules.findFirst({
         orderBy: { created_at: 'desc' }
       });
       if (!latestSchedule) {
@@ -229,8 +247,10 @@ async function getGapReport(req, res) {
       }
     });
 
-    // Fetch all enrollments with student relation
+    // Fetch only enrollments for sections in these entries
+    const sectionIds = entries.map(e => e.section_id);
     const enrollments = await prisma.enrollments.findMany({
+      where: { section_id: { in: sectionIds } },
       include: { students: true }
     });
 
@@ -247,10 +267,17 @@ async function getGapReport(req, res) {
 
     for (const entry of entries) {
       const allEnrs = sectionStudentsMap[entry.section_id] || [];
-      // Sort consistently
+      // Reconstruct using 20-student chunks
       allEnrs.sort((a, b) => Number(a.student_id) - Number(b.student_id));
-      const mid = Math.floor(allEnrs.length / 2);
-      const pEnrs = entry.part === 'Part 1' ? allEnrs.slice(0, mid) : allEnrs.slice(mid);
+      const chunkSize = 20;
+      let partNum = 1;
+      try {
+        partNum = parseInt(entry.part.split(' ')[1], 10) || 1;
+      } catch (e) {
+        partNum = 1;
+      }
+      const startIdx = (partNum - 1) * chunkSize;
+      const pEnrs = allEnrs.slice(startIdx, startIdx + chunkSize);
 
       for (const enr of pEnrs) {
         const studentId = enr.student_id;
@@ -388,15 +415,26 @@ async function getCourseStudents(req, res) {
       enrollmentDate: enr.enrollment_date
     }));
 
-    // Find all schedule entries for these sections
-    const scheduleEntries = await prisma.schedule_entries.findMany({
-      where: { section_id: { in: sectionIds } },
+    // Find active schedule (is_active = true) or fallback to latest
+    const activeSchedule = await prisma.exam_schedules.findFirst({
+      where: { is_active: true },
+      orderBy: { created_at: 'desc' }
+    }) || await prisma.exam_schedules.findFirst({
+      orderBy: { created_at: 'desc' }
+    });
+
+    // Find all schedule entries for these sections in the active schedule
+    const scheduleEntries = activeSchedule ? await prisma.schedule_entries.findMany({
+      where: {
+        section_id: { in: sectionIds },
+        schedule_id: activeSchedule.id
+      },
       include: {
         exam_slots: true,
         venues: true,
         exam_schedules: true
       }
-    });
+    }) : [];
 
     const formatTime = (dateObj) => {
       return new Date(dateObj).toISOString().split('T')[1].substring(0, 5);
@@ -447,6 +485,18 @@ async function getStudentSchedule(req, res) {
   try {
     const studentIdParam = req.params.id;
 
+    // Find active schedule (is_active = true) or fallback to latest
+    const activeSchedule = await prisma.exam_schedules.findFirst({
+      where: { is_active: true },
+      orderBy: { created_at: 'desc' }
+    }) || await prisma.exam_schedules.findFirst({
+      orderBy: { created_at: 'desc' }
+    });
+
+    if (!activeSchedule) {
+      return res.status(404).json({ error: 'No schedule has been generated yet.' });
+    }
+
     // 1. Retrieve Student
     let student;
     if (isNaN(studentIdParam)) {
@@ -494,8 +544,9 @@ async function getStudentSchedule(req, res) {
       });
 
       const studentIndex = allEnrs.findIndex(e => e.student_id === student.id);
-      const mid = Math.floor(allEnrs.length / 2);
-      const assignedPart = studentIndex < mid ? 'Part 1' : 'Part 2';
+      const chunkSize = 20;
+      const partNum = Math.floor(studentIndex / chunkSize) + 1;
+      const assignedPart = `Part ${partNum}`;
 
       registeredCourses.push({
         sectionId: enr.sections.id,
@@ -507,16 +558,22 @@ async function getStudentSchedule(req, res) {
         assignedPart
       });
 
-      // Find schedule entries matching the section & assigned part
+      // Find schedule entries matching the section, assigned part, and active schedule ID
       const entries = await prisma.schedule_entries.findMany({
         where: {
           section_id: sectionId,
-          part: assignedPart
+          part: assignedPart,
+          schedule_id: activeSchedule.id
         },
         include: {
           exam_slots: true,
           venues: true,
-          exam_schedules: true
+          exam_schedules: true,
+          sections: {
+            include: {
+              courses: true
+            }
+          }
         }
       });
 
@@ -528,6 +585,9 @@ async function getStudentSchedule(req, res) {
         schedule.push({
           scheduleName: entry.exam_schedules.name,
           part: entry.part,
+          courseCode: entry.sections.courses.code,
+          courseName: entry.sections.courses.name,
+          sectionName: entry.sections.name,
           slot: {
             id: entry.exam_slots.id,
             date: entry.exam_slots.date.toISOString().split('T')[0],
@@ -544,6 +604,14 @@ async function getStudentSchedule(req, res) {
         });
       });
     }
+
+    // Sort schedule entries chronologically: by date first, then by slotIndex
+    schedule.sort((a, b) => {
+      if (a.slot.date !== b.slot.date) {
+        return a.slot.date.localeCompare(b.slot.date);
+      }
+      return a.slot.slotIndex - b.slot.slotIndex;
+    });
 
     return res.json({
       student: {

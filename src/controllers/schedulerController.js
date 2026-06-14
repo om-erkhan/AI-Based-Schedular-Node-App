@@ -197,16 +197,29 @@ async function getScheduleTimetable(req, res) {
   }
 }
 
+async function listSchedules(req, res) {
+  try {
+    const list = await prisma.exam_schedules.findMany({
+      orderBy: { created_at: 'desc' }
+    });
+    return res.json(list);
+  } catch (error) {
+    console.error('Failed to list schedules:', error);
+    return res.status(500).json({ error: error.message });
+  }
+}
+
 async function downloadTimetablePdf(req, res) {
   try {
     const pythonUrl = process.env.PYTHON_SERVICE_URL || 'http://localhost:8001';
+    const scheduleId = req.query.schedule_id || '';
     const response = await axios({
       method: 'get',
-      url: `${pythonUrl}/api/reports/schedule-pdf`,
+      url: `${pythonUrl}/api/reports/schedule-pdf?schedule_id=${scheduleId}`,
       responseType: 'stream'
     });
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename="exam_schedule.pdf"');
+    res.setHeader('Content-Disposition', `attachment; filename="exam_schedule_${scheduleId || 'latest'}.pdf"`);
     response.data.pipe(res);
   } catch (error) {
     console.error('Failed to download schedule PDF:', error.message);
@@ -217,13 +230,14 @@ async function downloadTimetablePdf(req, res) {
 async function downloadStudentsPdf(req, res) {
   try {
     const pythonUrl = process.env.PYTHON_SERVICE_URL || 'http://localhost:8001';
+    const scheduleId = req.query.schedule_id || '';
     const response = await axios({
       method: 'get',
-      url: `${pythonUrl}/api/reports/students-pdf`,
+      url: `${pythonUrl}/api/reports/students-pdf?schedule_id=${scheduleId}`,
       responseType: 'stream'
     });
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename="course_students_venue.pdf"');
+    res.setHeader('Content-Disposition', `attachment; filename="course_students_venue_${scheduleId || 'latest'}.pdf"`);
     response.data.pipe(res);
   } catch (error) {
     console.error('Failed to download students PDF:', error.message);
@@ -235,6 +249,7 @@ module.exports = {
   triggerScheduleGeneration,
   getScheduleStatus,
   getScheduleTimetable,
+  listSchedules,
   downloadTimetablePdf,
   downloadStudentsPdf
 };
