@@ -78,7 +78,9 @@ async function triggerScheduleGeneration(req, res) {
   } catch (error) {
     console.error('Failed to trigger schedule generation:', error.message);
     const statusCode = error.response ? error.response.status : 500;
-    const detail = error.response && error.response.data ? error.response.data.detail : error.message;
+    const detail = error.response && error.response.data 
+      ? (error.response.data.detail || error.response.data.message || JSON.stringify(error.response.data)) 
+      : error.message;
     return res.status(statusCode).json({ error: `FastAPI error: ${detail}` });
   }
 }
